@@ -59,9 +59,9 @@ export default defineConfig({
         scope: ".",
         start_url: ".",
         id: ".",
-        short_name: "timelessFurnishing - E-Commerce Website",
-        name: "timelessFurnishing | eCommerce Admin Dashboard",
-        description: "timelessFurnishing :  e-commerce Admin Dashboard",
+        short_name: "lalaji namkeens - E-Commerce Website",
+        name: "lalaji namkeens | eCommerce Admin Dashboard",
+        description: "lalaji namkeens :  e-commerce Admin Dashboard",
         icons: [
           {
             src: "favicon.ico",
