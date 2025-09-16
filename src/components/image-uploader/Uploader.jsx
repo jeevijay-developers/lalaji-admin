@@ -75,81 +75,77 @@ const Uploader = ({
   };
 
   useEffect(() => {
-    if (fileRejections) {
-      fileRejections.map(({ file, errors }) => (
-        <li key={file.path}>
-          {file.path} - {file.size} bytes
-          <ul>
-            {errors.map((e) => (
-              <li key={e.code}>
-                {e.code === "too-many-files"
-                  ? notifyError(
-                      `Maximum ${globalSetting?.number_of_image_per_product} Image Can be Upload!`
-                    )
-                  : notifyError(e.message)}
-              </li>
-            ))}
-          </ul>
-        </li>
-      ));
+    if (fileRejections.length > 0) {
+      fileRejections.forEach(({ file, errors }) => {
+        errors.forEach((e) => {
+          notifyError(
+            e.code === "too-many-files"
+              ? `Maximum ${globalSetting?.number_of_image_per_product} images can be uploaded!`
+              : e.message
+          );
+        });
+      });
     }
 
-    if (files) {
+    if (files.length > 0) {
       files.forEach((file) => {
         if (
           product &&
-          imageUrl?.length + files?.length >
+          imageUrl.length + files.length >
             globalSetting?.number_of_image_per_product
         ) {
-          return notifyError(
-            `Maximum ${globalSetting?.number_of_image_per_product} Image Can be Upload!`
+          notifyError(
+            `Maximum ${globalSetting?.number_of_image_per_product} images can be uploaded!`
           );
+          return;
         }
 
-        setLoading(true);
-        setError("Uploading....");
-
-        const name = file.name.replaceAll(/\s/g, "");
-        const public_id = name?.substring(0, name.lastIndexOf("."));
-
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append(
-          "upload_preset",
-          import.meta.env.VITE_APP_CLOUDINARY_UPLOAD_PRESET
-        );
-        formData.append("cloud_name", import.meta.env.VITE_APP_CLOUD_NAME);
-        formData.append("folder", folder);
-        formData.append("public_id", public_id);
-
-        axios({
-          url: import.meta.env.VITE_APP_CLOUDINARY_URL,
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          data: formData,
-        })
-          .then((res) => {
-            notifySuccess("Image Uploaded successfully!");
-            setLoading(false);
-            if (product) {
-              setImageUrl((imgUrl) => [...imgUrl, res.data.secure_url]);
-            } else {
-              setImageUrl(res.data.secure_url);
-            }
-          })
-          .catch((err) => {
-            console.error("err", err);
-            notifyError(err.Message);
-            setLoading(false);
-          });
+        uploadImage(file);
       });
     }
   }, [files]);
 
+  const uploadImage = async (file) => {
+    setLoading(true);
+    setError("Uploading...");
+
+    const cloudName = import.meta.env.VITE_APP_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_APP_CLOUDINARY_UPLOAD_PRESET;
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+
+    const name = file.name.replaceAll(/\s/g, "");
+    const public_id = name.substring(0, name.lastIndexOf("."));
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+    formData.append("folder", folder);
+    formData.append("public_id", public_id);
+
+    try {
+      const res = await axios.post(url, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      notifySuccess("Image uploaded successfully!");
+      setLoading(false);
+
+      if (product) {
+        setImageUrl((prev) => [...prev, res.data.secure_url]);
+      } else {
+        setImageUrl(res.data.secure_url);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      notifyError(err.response?.data?.error?.message || "Upload failed!");
+      setLoading(false);
+    }
+  };
+
   const thumbs = files.map((file) => (
-    <div key={file.name}>
+    <div key={file.name} className="m-2">
       <div>
         <img
           className="inline-flex border-2 border-gray-100 w-24 max-h-24"
@@ -160,26 +156,25 @@ const Uploader = ({
     </div>
   ));
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    return () => {
       files.forEach((file) => URL.revokeObjectURL(file.preview));
-    },
-    [files]
-  );
+    };
+  }, [files]);
 
   const handleRemoveImage = async (img) => {
     try {
       setLoading(false);
-      notifyError("Image delete successfully!");
+      notifyError("Image deleted successfully!");
       if (product) {
-        const result = imageUrl?.filter((i) => i !== img);
+        const result = imageUrl.filter((i) => i !== img);
         setImageUrl(result);
       } else {
         setImageUrl("");
       }
     } catch (err) {
-      console.error("err", err);
-      notifyError(err.Message);
+      console.error("Error removing image:", err);
+      notifyError(err.message || "Error occurred while deleting image.");
       setLoading(false);
     }
   };
@@ -199,7 +194,8 @@ const Uploader = ({
       </div>
 
       <div className="text-emerald-500">{loading && err}</div>
-      <aside className="flex flex-row flex-wrap mt-4">
+
+      <aside className="flex flex-row flex-wrap mt-4 justify-center">
         {product ? (
           <DndProvider backend={HTML5Backend}>
             <Container
@@ -208,8 +204,8 @@ const Uploader = ({
               handleRemoveImage={handleRemoveImage}
             />
           </DndProvider>
-        ) : !product && imageUrl ? (
-          <div className="relative">
+        ) : imageUrl ? (
+          <div className="relative m-2">
             <img
               className="inline-flex border rounded-md border-gray-100 dark:border-gray-600 w-24 max-h-24 p-2"
               src={imageUrl}
